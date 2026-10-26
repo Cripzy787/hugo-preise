@@ -3,6 +3,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,3 +36,13 @@ jobs:
         with:
           name: cripzys-hugo-preise
           path: build/libs/*.jar
+      - name: Fertige Mod ins Repository legen
+        if: github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p download
+          rm -f download/*.jar
+          cp $(ls build/libs/*.jar | grep -v -- '-sources') download/
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add download
+          git diff --cached --quiet || (git commit -m "Fertige Mod [skip ci]" && git push)
