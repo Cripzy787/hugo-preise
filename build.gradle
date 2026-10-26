@@ -35,3 +35,8 @@ java {
     sourceCompatibility = JavaVersion.VERSION_25
     targetCompatibility = JavaVersion.VERSION_25
 }
+
+// Die Logik-Tests laufen separat (siehe Workflow), nicht ueber JUnit.
+tasks.withType(Test).configureEach {
+    failOnNoDiscoveredTests = false
+}
