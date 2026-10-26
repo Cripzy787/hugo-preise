@@ -21,7 +21,14 @@ jobs:
           javac -d out $(find src/main/java/de/hugoprices/logic src/test -name '*.java')
           java -cp out de.hugoprices.logic.LogicTest
       - name: Mod bauen
-        run: gradle build
+        run: |
+          set +e
+          gradle build --console=plain --stacktrace > build.log 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then
+            grep -nE "What went wrong|Could not|error:|FAILED|Caused by|not found|Unsupported|No matching|Plugin" build.log | head -9 | cut -c1-400 | while IFS= read -r l; do echo "::error::$l"; done
+          fi
+          exit $code
       - uses: actions/upload-artifact@v4
         with:
           name: cripzys-hugo-preise
