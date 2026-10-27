@@ -270,6 +270,8 @@ public final class MarketTest {
             c3.lookup(KEY);
             Thread.sleep(1500);
             eq(true, c3.lookup(KEY).result() == null, "503 ergibt kein Ergebnis");
+            eq(true, c3.lookup(KEY).error() != null && c3.lookup(KEY).error().contains("503"),
+                    "Fehlergrund 503 wird gemeldet");
 
             // HTML statt Daten (z. B. Cloudflare-Schutzseite)
             mode.set(2);
@@ -277,6 +279,7 @@ public final class MarketTest {
             c4.lookup(KEY);
             Thread.sleep(1500);
             eq(true, c4.lookup(KEY).result() == null, "HTML ergibt kein Ergebnis");
+            eq(true, c4.lookup(KEY).error() != null, "Fehlergrund bei HTML wird gemeldet");
         } finally {
             server.stop(0);
         }

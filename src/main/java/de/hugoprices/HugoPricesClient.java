@@ -100,11 +100,15 @@ public final class HugoPricesClient implements ClientModInitializer {
 
         MarketClient.Result web = null;
         boolean loading = false;
+        String webError = null;
         String marketKey = settings.webEnabled ? marketKeyOf(stack) : null;
         if (marketKey != null) {
             MarketClient.Lookup lookup = market.lookup(marketKey);
             web = lookup.result();
             loading = lookup.loading() && web == null;
+            webError = web == null ? lookup.error() : null;
+        } else if (settings.webEnabled && isUnsupported(stack)) {
+            lines.add(Component.literal("Preise: fuer diese Item-Art nicht verfuegbar").withStyle(ChatFormatting.GRAY));
         }
         String gameKey = keyOf(stack);
 
@@ -144,7 +148,17 @@ public final class HugoPricesClient implements ClientModInitializer {
         }
         if (loading) {
             lines.add(Component.literal("Preise werden geladen ...").withStyle(ChatFormatting.DARK_GRAY));
+        } else if (webError != null) {
+            lines.add(Component.literal("Preise nicht abrufbar: " + webError).withStyle(ChatFormatting.RED));
         }
+    }
+
+    /** Items, deren Marktschlüssel mehr als die ID braucht (Tränke, Spawner, Köpfe ...): nicht abfragen. */
+    private static boolean isUnsupported(ItemStack stack) {
+        String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+        return id.endsWith("potion") || id.endsWith("tipped_arrow") || id.endsWith("spawner")
+                || id.endsWith("_head") || id.endsWith("_skull") || id.endsWith("written_book")
+                || id.endsWith("filled_map") || id.endsWith("firework_rocket") || id.endsWith("firework_star");
     }
 
     private static List<String> loreOf(ItemStack stack) {
@@ -174,8 +188,11 @@ public final class HugoPricesClient implements ClientModInitializer {
 
     /** Schlüssel für hugosmp-market.net, z. B. "enchanted_book/multishot:1". null = nicht abfragen. */
     private static String marketKeyOf(ItemStack stack) {
+        if (isUnsupported(stack)) {
+            return null;
+        }
         List<String> ench = enchantsOf(stack);
-        if (ench.isEmpty() && !settings.queryPlainItems) {
+        if (ench.isEmpty() && settings.onlyEnchanted) {
             return null;
         }
         return ItemKeyBuilder.build(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString(), ench,

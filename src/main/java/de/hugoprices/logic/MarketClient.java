@@ -37,14 +37,18 @@ public final class MarketClient {
     public record Result(Optional<Quote> auction, Optional<Quote> order, long fetchedAtMillis) {
     }
 
-    /** result kann null sein (noch nichts bekannt). loading = ein Abruf läuft gerade. */
-    public record Lookup(Result result, boolean loading) {
+    /**
+     * result kann null sein (noch nichts bekannt). loading = ein Abruf läuft gerade.
+     * error = Grund des letzten fehlgeschlagenen Abrufs (null, wenn zuletzt alles gut ging).
+     */
+    public record Lookup(Result result, boolean loading, String error) {
     }
 
     private static final class State {
         Result result;
         boolean inFlight;
         long retryAfterMillis;
+        String lastError;
     }
 
     private final Settings settings;
@@ -93,7 +97,11 @@ public final class MarketClient {
             pending++;
             worker.execute(() -> run(key));
         }
-        return new Lookup(st.result, st.inFlight);
+        String error = st.lastError;
+        if (error == null && st.result == null && now < globalRetryAfterMillis) {
+            error = "Pause nach mehreren Fehlern";
+        }
+        return new Lookup(st.result, st.inFlight, error);
     }
 
     private void run(String key) {
@@ -116,8 +124,10 @@ public final class MarketClient {
             if (result != null) {
                 st.result = result;
                 st.retryAfterMillis = 0;
+                st.lastError = null;
                 consecutiveFailures = 0;
             } else {
+                st.lastError = describe(error);
                 st.retryAfterMillis = now + ITEM_RETRY_MILLIS;
                 consecutiveFailures++;
                 if (consecutiveFailures >= 3) {
@@ -128,6 +138,24 @@ public final class MarketClient {
                         "Marktabruf fehlgeschlagen fuer " + key + ": " + error);
             }
         }
+    }
+
+    /** Kurze, lesbare Fehlerbeschreibung für den Tooltip. */
+    static String describe(Exception e) {
+        if (e == null) {
+            return "unbekannter Fehler";
+        }
+        String m = e.getMessage();
+        if (e instanceof java.net.http.HttpTimeoutException || e instanceof java.net.http.HttpConnectTimeoutException) {
+            return "Zeitueberschreitung";
+        }
+        if (e instanceof java.net.ConnectException || e instanceof java.nio.channels.UnresolvedAddressException) {
+            return "keine Verbindung";
+        }
+        if (m == null || m.isBlank()) {
+            return e.getClass().getSimpleName();
+        }
+        return m.length() > 60 ? m.substring(0, 60) : m;
     }
 
     private void throttle() throws InterruptedException {

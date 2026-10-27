@@ -45,8 +45,8 @@ public final class Settings {
     public long ahMaxAgeMinutes = 60;
     /** Orders, die älter sind (Stunden), zählen nicht. 0 = kein Limit. */
     public long orderMaxAgeHours = 168;
-    /** true: auch Items ohne Verzauberung abfragen (mehr Abrufe). */
-    public boolean queryPlainItems = false;
+    /** true: nur verzauberte Items abfragen. false: jedes Item. */
+    public boolean onlyEnchanted = false;
     /** Trennzeichen zwischen mehreren Verzauberungen im Item-Schlüssel (nicht bestätigt). */
     public String enchantSeparator = ",";
 
@@ -86,8 +86,8 @@ public final class Settings {
             ahMaxAgeMinutes=60
             # Orders aelter als so viele Stunden zaehlen nicht (0 = kein Limit).
             orderMaxAgeHours=168
-            # true = auch Items ohne Verzauberung abfragen.
-            queryPlainItems=false
+            # true = nur verzauberte Items abfragen, false = jedes Item.
+            onlyEnchanted=false
             # Trennzeichen zwischen mehreren Verzauberungen im Item-Schluessel.
             enchantSeparator=,
             """;
@@ -130,7 +130,7 @@ public final class Settings {
             s.webCacheSeconds = Math.max(10, longValue(p, "webCacheSeconds", s.webCacheSeconds));
             s.ahMaxAgeMinutes = Math.max(0, longValue(p, "ahMaxAgeMinutes", s.ahMaxAgeMinutes));
             s.orderMaxAgeHours = Math.max(0, longValue(p, "orderMaxAgeHours", s.orderMaxAgeHours));
-            s.queryPlainItems = bool(p, "queryPlainItems", s.queryPlainItems);
+            s.onlyEnchanted = bool(p, "onlyEnchanted", s.onlyEnchanted);
             String sep = p.getProperty("enchantSeparator");
             if (sep != null && !sep.isEmpty()) {
                 s.enchantSeparator = sep;
