@@ -90,10 +90,6 @@ public final class HugoPricesClient implements ClientModInitializer {
         if (stack.isEmpty()) {
             return;
         }
-        // Menü-Einträge mit eigener Preiszeile nicht noch einmal beschriften.
-        if (PriceExtractor.extract(loreOf(stack), settings).isPresent()) {
-            return;
-        }
         long nowMs = System.currentTimeMillis();
         long maxAge = settings.maxAgeMinutes * 60_000L;
         String cur = settings.currencySymbol;

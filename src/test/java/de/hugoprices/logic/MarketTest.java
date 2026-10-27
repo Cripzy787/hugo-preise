@@ -273,6 +273,16 @@ public final class MarketTest {
             eq(true, c3.lookup(KEY).error() != null && c3.lookup(KEY).error().contains("503"),
                     "Fehlergrund 503 wird gemeldet");
 
+            // Nach drei Fehlern: Pause, aber der echte Grund bleibt sichtbar
+            MarketClient c5 = new MarketClient(s, () -> fixedNow);
+            c5.lookup("a/b:1");
+            c5.lookup("c/d:1");
+            c5.lookup("e/f:1");
+            Thread.sleep(4500);
+            MarketClient.Lookup paused = c5.lookup("g/h:1");
+            eq(true, paused.error() != null && paused.error().contains("Pause") && paused.error().contains("503"),
+                    "Pausenmeldung nennt den echten Grund: " + paused.error());
+
             // HTML statt Daten (z. B. Cloudflare-Schutzseite)
             mode.set(2);
             MarketClient c4 = new MarketClient(s, () -> fixedNow);

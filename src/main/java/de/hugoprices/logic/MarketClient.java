@@ -61,6 +61,7 @@ public final class MarketClient {
     private int pending = 0;
     private int consecutiveFailures = 0;
     private long globalRetryAfterMillis = 0;
+    private String lastGlobalError = "unbekannt";
     private long lastRequestMillis = 0;
 
     public MarketClient(Settings settings) {
@@ -99,7 +100,7 @@ public final class MarketClient {
         }
         String error = st.lastError;
         if (error == null && st.result == null && now < globalRetryAfterMillis) {
-            error = "Pause nach mehreren Fehlern";
+            error = "Pause nach Fehlern, letzter Grund: " + lastGlobalError;
         }
         return new Lookup(st.result, st.inFlight, error);
     }
@@ -128,6 +129,7 @@ public final class MarketClient {
                 consecutiveFailures = 0;
             } else {
                 st.lastError = describe(error);
+                lastGlobalError = st.lastError;
                 st.retryAfterMillis = now + ITEM_RETRY_MILLIS;
                 consecutiveFailures++;
                 if (consecutiveFailures >= 3) {
@@ -155,7 +157,9 @@ public final class MarketClient {
         if (m == null || m.isBlank()) {
             return e.getClass().getSimpleName();
         }
-        return m.length() > 60 ? m.substring(0, 60) : m;
+        // "HTTP 403" und "keine Daten erhalten" sind selbsterklärend, sonst die Fehlerart davorsetzen.
+        String text = (m.startsWith("HTTP ") || m.startsWith("keine Daten")) ? m : e.getClass().getSimpleName() + ": " + m;
+        return text.length() > 90 ? text.substring(0, 90) : text;
     }
 
     private void throttle() throws InterruptedException {
