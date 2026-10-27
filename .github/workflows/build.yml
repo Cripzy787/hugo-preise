@@ -23,6 +23,7 @@ jobs:
           mkdir -p out
           javac -d out $(find src/main/java/de/hugoprices/logic src/test -name '*.java')
           java -cp out de.hugoprices.logic.LogicTest
+          java -cp out de.hugoprices.logic.MarketTest
       - name: Mod bauen
         run: |
           set +e

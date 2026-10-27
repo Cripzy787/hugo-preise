@@ -35,6 +35,21 @@ public final class Settings {
     /** Alle wie viele Ticks (20 Ticks = 1 Sekunde) das offene Menü gelesen wird. */
     public int scanEveryTicks = 5;
 
+    /** Live-Preise von hugosmp-market.net abrufen (true) oder nur im Spiel mitgelesene Preise nutzen (false). */
+    public boolean webEnabled = true;
+    /** Adresse des Marktdaten-Stroms. Der Item-Schlüssel wird hinten angehängt. */
+    public String webBaseUrl = "https://hugosmp-market.net/api/stream/item?item=";
+    /** So lange (Sekunden) werden abgerufene Preise zwischengespeichert, bevor neu gefragt wird. */
+    public long webCacheSeconds = 60;
+    /** Angebote im Auktionshaus, die älter sind (Minuten), zählen nicht. 0 = kein Limit. */
+    public long ahMaxAgeMinutes = 60;
+    /** Orders, die älter sind (Stunden), zählen nicht. 0 = kein Limit. */
+    public long orderMaxAgeHours = 168;
+    /** true: auch Items ohne Verzauberung abfragen (mehr Abrufe). */
+    public boolean queryPlainItems = false;
+    /** Trennzeichen zwischen mehreren Verzauberungen im Item-Schlüssel (nicht bestätigt). */
+    public String enchantSeparator = ",";
+
     private static final String DEFAULT_FILE = """
             # Cripzy's Hugo Preise - Einstellungen. Listen werden mit Komma getrennt, Gross-/Kleinschreibung egal.
             # Nach Aenderungen Minecraft neu starten.
@@ -61,6 +76,20 @@ public final class Settings {
             # So lange (Minuten) bleibt ein gemerkter Preis sichtbar, wenn du ihn nicht erneut siehst.
             maxAgeMinutes=15
             scanEveryTicks=5
+
+            # Live-Preise von hugosmp-market.net (true) oder nur Preise nutzen, die du im Spiel gesehen hast (false).
+            webEnabled=true
+            webBaseUrl=https://hugosmp-market.net/api/stream/item?item=
+            # So lange (Sekunden) wird ein abgerufener Preis zwischengespeichert.
+            webCacheSeconds=60
+            # Auktionen aelter als so viele Minuten zaehlen nicht (0 = kein Limit).
+            ahMaxAgeMinutes=60
+            # Orders aelter als so viele Stunden zaehlen nicht (0 = kein Limit).
+            orderMaxAgeHours=168
+            # true = auch Items ohne Verzauberung abfragen.
+            queryPlainItems=false
+            # Trennzeichen zwischen mehreren Verzauberungen im Item-Schluessel.
+            enchantSeparator=,
             """;
 
     public static Settings load(Path file) {
@@ -93,6 +122,19 @@ public final class Settings {
             }
             s.maxAgeMinutes = Math.max(1, longValue(p, "maxAgeMinutes", s.maxAgeMinutes));
             s.scanEveryTicks = (int) Math.max(1, longValue(p, "scanEveryTicks", s.scanEveryTicks));
+            s.webEnabled = bool(p, "webEnabled", s.webEnabled);
+            String url = p.getProperty("webBaseUrl");
+            if (url != null && !url.isBlank()) {
+                s.webBaseUrl = url.trim();
+            }
+            s.webCacheSeconds = Math.max(10, longValue(p, "webCacheSeconds", s.webCacheSeconds));
+            s.ahMaxAgeMinutes = Math.max(0, longValue(p, "ahMaxAgeMinutes", s.ahMaxAgeMinutes));
+            s.orderMaxAgeHours = Math.max(0, longValue(p, "orderMaxAgeHours", s.orderMaxAgeHours));
+            s.queryPlainItems = bool(p, "queryPlainItems", s.queryPlainItems);
+            String sep = p.getProperty("enchantSeparator");
+            if (sep != null && !sep.isEmpty()) {
+                s.enchantSeparator = sep;
+            }
         } catch (IOException | RuntimeException e) {
             // Bei Fehlern gelten die Standardwerte.
         }

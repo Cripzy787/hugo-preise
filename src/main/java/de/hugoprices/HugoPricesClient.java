@@ -1,10 +1,13 @@
 package de.hugoprices;
 
+import de.hugoprices.logic.ItemKeyBuilder;
+import de.hugoprices.logic.MarketClient;
 import de.hugoprices.logic.Mode;
 import de.hugoprices.logic.ModeDetector;
 import de.hugoprices.logic.MoneyFormat;
 import de.hugoprices.logic.PriceBook;
 import de.hugoprices.logic.PriceExtractor;
+import de.hugoprices.logic.Quote;
 import de.hugoprices.logic.Settings;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,18 +27,21 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemLore;
 
 /**
- * Liest Preise aus dem Auktionshaus- und Order-Menü mit und zeigt sie im Tooltip an:
- * AH = niedrigster gesehener Preis, Order = höchster gesehener Preis.
+ * Zeigt im Tooltip eines verzauberten Items den niedrigsten Auktionspreis und den höchsten Order-Preis.
+ * Quelle 1: Live-Daten von hugosmp-market.net (im Hintergrund abgerufen).
+ * Quelle 2 (Ersatz): Preise, die im Auktionshaus-/Order-Menü im Spiel gesehen wurden.
  */
 public final class HugoPricesClient implements ClientModInitializer {
     public static final PriceBook BOOK = new PriceBook();
     private static Settings settings = new Settings();
+    private static MarketClient market;
 
     @Override
     public void onInitializeClient() {
         settings = Settings.load(FabricLoader.getInstance().getConfigDir().resolve("hugoprices.properties"));
+        market = new MarketClient(settings);
 
-        // Menü offen: alle paar Ticks die Einträge lesen.
+        // Menü offen: alle paar Ticks die Einträge lesen (Ersatzquelle).
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (!(screen instanceof AbstractContainerScreen<?> container)) {
                 return;
@@ -88,19 +94,56 @@ public final class HugoPricesClient implements ClientModInitializer {
         if (PriceExtractor.extract(loreOf(stack), settings).isPresent()) {
             return;
         }
-        String key = keyOf(stack);
-        long now = System.currentTimeMillis();
+        long nowMs = System.currentTimeMillis();
         long maxAge = settings.maxAgeMinutes * 60_000L;
         String cur = settings.currencySymbol;
+
+        MarketClient.Result web = null;
+        boolean loading = false;
+        String marketKey = settings.webEnabled ? marketKeyOf(stack) : null;
+        if (marketKey != null) {
+            MarketClient.Lookup lookup = market.lookup(marketKey);
+            web = lookup.result();
+            loading = lookup.loading() && web == null;
+        }
+        String gameKey = keyOf(stack);
+
         if (settings.showAh) {
-            BOOK.get(Mode.AH, key, now, maxAge).ifPresent(e -> lines.add(Component
-                    .literal("AH: " + MoneyFormat.format(e.price(), cur) + " (" + MoneyFormat.age(now - e.seenAtMillis()) + ")")
-                    .withStyle(ChatFormatting.GOLD)));
+            Optional<Quote> q = web != null ? web.auction() : Optional.empty();
+            if (q.isPresent()) {
+                lines.add(Component.literal("AH: " + MoneyFormat.format(q.get().price(), cur)
+                        + " (" + MoneyFormat.age(nowMs - q.get().seenAt().toEpochMilli()) + ")")
+                        .withStyle(ChatFormatting.GOLD));
+            } else {
+                Optional<PriceBook.Entry> g = BOOK.get(Mode.AH, gameKey, nowMs, maxAge);
+                if (g.isPresent()) {
+                    lines.add(Component.literal("AH: " + MoneyFormat.format(g.get().price(), cur)
+                            + " (im Spiel gesehen, " + MoneyFormat.age(nowMs - g.get().seenAtMillis()) + ")")
+                            .withStyle(ChatFormatting.GOLD));
+                } else if (web != null) {
+                    lines.add(Component.literal("AH: kein aktuelles Angebot").withStyle(ChatFormatting.GRAY));
+                }
+            }
         }
         if (settings.showOrder) {
-            BOOK.get(Mode.ORDER, key, now, maxAge).ifPresent(e -> lines.add(Component
-                    .literal("Order: " + MoneyFormat.format(e.price(), cur) + " (" + MoneyFormat.age(now - e.seenAtMillis()) + ")")
-                    .withStyle(ChatFormatting.AQUA)));
+            Optional<Quote> q = web != null ? web.order() : Optional.empty();
+            if (q.isPresent()) {
+                lines.add(Component.literal("Order: " + MoneyFormat.format(q.get().price(), cur)
+                        + " (" + MoneyFormat.age(nowMs - q.get().seenAt().toEpochMilli()) + ")")
+                        .withStyle(ChatFormatting.AQUA));
+            } else {
+                Optional<PriceBook.Entry> g = BOOK.get(Mode.ORDER, gameKey, nowMs, maxAge);
+                if (g.isPresent()) {
+                    lines.add(Component.literal("Order: " + MoneyFormat.format(g.get().price(), cur)
+                            + " (im Spiel gesehen, " + MoneyFormat.age(nowMs - g.get().seenAtMillis()) + ")")
+                            .withStyle(ChatFormatting.AQUA));
+                } else if (web != null) {
+                    lines.add(Component.literal("Order: keine Order gefunden").withStyle(ChatFormatting.GRAY));
+                }
+            }
+        }
+        if (loading) {
+            lines.add(Component.literal("Preise werden geladen ...").withStyle(ChatFormatting.DARK_GRAY));
         }
     }
 
@@ -115,7 +158,31 @@ public final class HugoPricesClient implements ClientModInitializer {
         return out;
     }
 
-    /** Schlüssel = Item-ID + sortierte Verzauberungen (gespeicherte bei Büchern inklusive). */
+    /** Verzauberungen als "minecraft:sharpness=5" (bei Büchern die gespeicherten). */
+    private static List<String> enchantsOf(ItemStack stack) {
+        List<String> ench = new ArrayList<>();
+        var direct = stack.get(DataComponents.ENCHANTMENTS);
+        if (direct != null) {
+            direct.entrySet().forEach(e -> ench.add(e.getKey().getRegisteredName() + "=" + e.getIntValue()));
+        }
+        var stored = stack.get(DataComponents.STORED_ENCHANTMENTS);
+        if (stored != null) {
+            stored.entrySet().forEach(e -> ench.add(e.getKey().getRegisteredName() + "=" + e.getIntValue()));
+        }
+        return ench;
+    }
+
+    /** Schlüssel für hugosmp-market.net, z. B. "enchanted_book/multishot:1". null = nicht abfragen. */
+    private static String marketKeyOf(ItemStack stack) {
+        List<String> ench = enchantsOf(stack);
+        if (ench.isEmpty() && !settings.queryPlainItems) {
+            return null;
+        }
+        return ItemKeyBuilder.build(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString(), ench,
+                settings.enchantSeparator);
+    }
+
+    /** Schlüssel für die im Spiel gesehenen Preise: Item-ID + sortierte Verzauberungen. */
     private static String keyOf(ItemStack stack) {
         StringBuilder sb = new StringBuilder(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
         List<String> ench = new ArrayList<>();

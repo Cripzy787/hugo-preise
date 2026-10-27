@@ -3,15 +3,16 @@
 Zeigt im Tooltip eines Items den **günstigsten AH-Preis** und den **höchsten Order-Preis**.
 
 ## So funktioniert es
-Die Mod liest die Preise mit, während du das Auktionshaus (`/ah`) oder das Order-Menü offen hast.
-Pro Item (inkl. Verzauberungen) merkt sie sich im AH den niedrigsten und bei Order den höchsten Preis, den sie gesehen hat.
-Beim Hovern über ein Item steht das unter den Verzauberungen:
+Beim Hovern über ein **verzaubertes** Item holt die Mod im Hintergrund die aktuellen Marktdaten von
+hugosmp-market.net und zeigt unter den Verzauberungen:
 
-    AH: $1.500.000 (vor 3 Min)
-    Order: $2.000.000 (vor 3 Min)
+    AH: $47.000 (vor 3 Min)       <- niedrigster Stückpreis aller Auktionen der letzten 60 Min
+    Order: $100.000 (vor 5 Std)   <- höchster Stückpreis aller Orders (bis 7 Tage alt)
 
-Tipp: Sortiere im AH nach Preis aufsteigend und in Order nach Preis absteigend, dann liegt der gesuchte Preis auf der ersten Seite.
-Die Werte gelten nur für das, was du seit dem Start gesehen hast und werden nach 15 Minuten ausgeblendet (einstellbar).
+- Abrufe laufen im Hintergrund, einer nach dem anderen, und werden 60 Sekunden zwischengespeichert.
+- Klappt der Abruf nicht (Seite nicht erreichbar, geblockt), nutzt die Mod ersatzweise Preise, die du im
+  Auktionshaus-/Order-Menü im Spiel gesehen hast.
+- Die Zeit in Klammern sagt, wann der Preis auf dem Markt zuletzt gesehen wurde.
 
 ## Bauen (empfohlen: GitHub)
 1. Neues GitHub-Repository anlegen und den Inhalt dieses Ordners hochladen.

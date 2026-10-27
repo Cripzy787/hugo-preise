@@ -23,10 +23,17 @@ public final class MoneyFormat {
     }
 
     public static String age(long millis) {
-        long minutes = millis / 60_000L;
+        long minutes = Math.max(0, millis) / 60_000L;
         if (minutes < 1) {
             return "gerade eben";
         }
-        return "vor " + minutes + " Min";
+        if (minutes < 60) {
+            return "vor " + minutes + " Min";
+        }
+        long hours = minutes / 60;
+        if (hours < 24) {
+            return "vor " + hours + " Std";
+        }
+        return "vor " + (hours / 24) + " Tg";
     }
 }
